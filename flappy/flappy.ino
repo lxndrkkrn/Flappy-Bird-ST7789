@@ -28,22 +28,23 @@
 // =============================================================================
 
 #include <Adafruit_GFX.h>
-#include <Adafruit_ST7735.h>
+#include <Adafruit_ST7789.h>
 #include <SPI.h>
 
 // initialize Sainsmart 1.8" TFT screen
 // (connect pins accordingly or change these values)
-#define TFT_DC            9     // Sainsmart RS/DC
-#define TFT_RST           8     // Sainsmart RES
+#define TFT_DC            8     // Sainsmart RS/DC
+#define TFT_RST           9     // Sainsmart RES
 #define TFT_CS           10     // Sainsmart CS
 // initialize screen with pins
-static Adafruit_ST7735 TFT = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
+static Adafruit_ST7789 TFT = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 // instead of using TFT.width() and TFT.height() set constant values
 // (we can change the size of the game easily that way)
+//TODO 240x240
 #define TFTW            128     // screen width
 #define TFTH            160     // screen height
-#define TFTW2            64     // half screen width
-#define TFTH2            80     // half screen height
+#define TFTW2      (TFTW/2)     // half screen width
+#define TFTH2      (TFTH/2)     // half screen height
 // game constant
 #define SPEED             1
 #define GRAVITY         9.8
@@ -53,8 +54,8 @@ static Adafruit_ST7735 TFT = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
 // bird size
 #define BIRDW             8     // bird width
 #define BIRDH             8     // bird height
-#define BIRDW2            4     // half width
-#define BIRDH2            4     // half height
+#define BIRDW2    (BIRDW/2)     // half width
+#define BIRDH2    (BIRDH/2)     // half height
 // pipe size
 #define PIPEW            12     // pipe width
 #define GAPHEIGHT        36     // pipe gap height
@@ -63,30 +64,32 @@ static Adafruit_ST7735 TFT = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
 // grass size
 #define GRASSH            4     // grass height (inside floor, starts at floor y)
 
+#define TAP_PIN         PD2     // Button D2
+
 // background
-const unsigned int BCKGRDCOL = TFT.Color565(138,235,244);
+const unsigned int BCKGRDCOL = TFT.color565(138,235,244);
 // bird
-const unsigned int BIRDCOL = TFT.Color565(255,254,174);
+const unsigned int BIRDCOL = TFT.color565(255,254,174);
 // pipe
-const unsigned int PIPECOL  = TFT.Color565(99,255,78);
+const unsigned int PIPECOL  = TFT.color565(99,255,78);
 // pipe highlight
-const unsigned int PIPEHIGHCOL  = TFT.Color565(250,255,250);
+const unsigned int PIPEHIGHCOL  = TFT.color565(250,255,250);
 // pipe seam
-const unsigned int PIPESEAMCOL  = TFT.Color565(0,0,0);
+const unsigned int PIPESEAMCOL  = TFT.color565(0,0,0);
 // floor
-const unsigned int FLOORCOL = TFT.Color565(246,240,163);
+const unsigned int FLOORCOL = TFT.color565(246,240,163);
 // grass (col2 is the stripe color)
-const unsigned int GRASSCOL  = TFT.Color565(141,225,87);
-const unsigned int GRASSCOL2 = TFT.Color565(156,239,88);
+const unsigned int GRASSCOL  = TFT.color565(141,225,87);
+const unsigned int GRASSCOL2 = TFT.color565(156,239,88);
 
 // bird sprite
 // bird sprite colors (Cx name for values to keep the array readable)
 #define C0 BCKGRDCOL
-#define C1 TFT.Color565(195,165,75)
+#define C1 TFT.color565(195,165,75)
 #define C2 BIRDCOL
-#define C3 ST7735_WHITE
-#define C4 ST7735_RED
-#define C5 TFT.Color565(251,216,114)
+#define C3 ST77XX_WHITE
+#define C4 ST77XX_RED
+#define C5 TFT.color565(251,216,114)
 static unsigned int birdcol[] =
 { C0, C0, C1, C1, C1, C1, C1, C0,
   C0, C1, C2, C2, C2, C1, C3, C1,
@@ -95,7 +98,7 @@ static unsigned int birdcol[] =
   C1, C2, C2, C2, C2, C2, C4, C4,
   C1, C2, C2, C2, C1, C5, C4, C0,
   C0, C1, C2, C1, C5, C5, C5, C0,
-  C0, C0, C1, C5, C5, C5, C0, C0};
+  C0, C0, C1, C5, C5, C5, C0, C0 };
 
 // bird structure
 static struct BIRD {
@@ -126,9 +129,9 @@ static short tmpx, tmpy;
 // ---------------
 void setup() {
   // initialize the push button on pin 2 as an input
-  DDRD &= ~(1<<PD2);
+  DDRD &= ~(1<<TAP_PIN);
   // initialize a ST7735S chip, black tab
-  TFT.initR(INITR_BLACKTAB);
+  TFT.init(TFTW, TFTH, SPI_MODE2);           // Init ST7789 240x240
 }
 
 // ---------------
@@ -152,12 +155,12 @@ void game_loop() {
   unsigned char GAMEH = TFTH - FLOORH;
   // draw the floor once, we will not overwrite on this area in-game
   // black line
-  TFT.drawFastHLine(0, GAMEH, TFTW, ST7735_BLACK);
+  TFT.drawFastHLine(0, GAMEH, TFTW, ST77XX_BLACK);
   // grass and stripe
   TFT.fillRect(0, GAMEH+1, TFTW2, GRASSH, GRASSCOL);
   TFT.fillRect(TFTW2, GAMEH+1, TFTW2, GRASSH, GRASSCOL2);
   // black line
-  TFT.drawFastHLine(0, GAMEH+GRASSH, TFTW, ST7735_BLACK);
+  TFT.drawFastHLine(0, GAMEH+GRASSH, TFTW, ST77XX_BLACK);
   // mud
   TFT.fillRect(0, GAMEH+GRASSH+1, TFTW, FLOORH-GRASSH, FLOORCOL);
   // grass x position (for stripe animation)
@@ -177,7 +180,7 @@ void game_loop() {
       // ===============
       // input
       // ===============
-      if ( !(PIND & (1<<PD2)) ) {
+      if ( PIND & (1<<TAP_PIN) ) {
         // if the bird is not too close to the top of the screen apply jump force
         if (bird.y > BIRDH2*0.5) bird.vel_y = -JUMP_FORCE;
         // else zero velocity
@@ -284,7 +287,7 @@ void game_loop() {
       TFT.setCursor( TFTW2, 4);
       TFT.print(score);
       // set text color back to white for new score
-      TFT.setTextColor(ST7735_WHITE);
+      TFT.setTextColor(ST77XX_WHITE);
       // increase score since we successfully passed a pipe
       score++;
     }
@@ -303,10 +306,10 @@ void game_loop() {
 // game start
 // ---------------
 void game_start() {
-  TFT.fillScreen(ST7735_BLACK);
-  TFT.fillRect(10, TFTH2 - 20, TFTW-20, 1, ST7735_WHITE);
-  TFT.fillRect(10, TFTH2 + 32, TFTW-20, 1, ST7735_WHITE);
-  TFT.setTextColor(ST7735_WHITE);
+  TFT.fillScreen(ST77XX_BLACK);
+  TFT.fillRect(10, TFTH2 - 20, TFTW-20, 1, ST77XX_WHITE);
+  TFT.fillRect(10, TFTH2 + 32, TFTW-20, 1, ST77XX_WHITE);
+  TFT.setTextColor(ST77XX_WHITE);
   TFT.setTextSize(3);
   // half width - num char * char width in pixels
   TFT.setCursor( TFTW2-(6*9), TFTH2 - 16);
@@ -321,7 +324,7 @@ void game_start() {
   TFT.println("press button");
   while (1) {
     // wait for push button
-    if ( !(PIND & (1<<PD2)) ) break;
+    if ( PIND & (1<<TAP_PIN) ) break;
   }
   
   // init game settings
@@ -352,8 +355,8 @@ void game_init() {
 // game over
 // ---------------
 void game_over() {
-  TFT.fillScreen(ST7735_BLACK);
-  TFT.setTextColor(ST7735_WHITE);
+  TFT.fillScreen(ST77XX_BLACK);
+  TFT.setTextColor(ST77XX_WHITE);
   TFT.setTextSize(2);
   // half width - num char * char width in pixels
   TFT.setCursor( TFTW2 - (9*6), TFTH2 - 4);
@@ -366,7 +369,7 @@ void game_over() {
   TFT.println("press button");
   while (1) {
     // wait for push button
-    if ( !(PIND & (1<<PD2)) ) break;
+    if ( PIND & (1<<TAP_PIN) ) break;
   }
 }
 
